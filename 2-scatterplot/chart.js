@@ -1,22 +1,32 @@
-(() => {
-    const dateParser = d3.timeParse('%Y-%m-%d');
-    const yAccessor = d => d.temperatureMax;
-    const xAccessor  = d => dateParser(d.date);
-    const lineGenerator = d3.line()
+(async () => {
+    const dataset = await d3.json('./my_weather_data.json');
+    const xAccessor  = d => d.humidity;
+    const yAccessor = d => d.dewPoint;
+    const colorAccesor = d => d.cloudCover;
 
-    let dimensions = {
-        width: window.innerWidth * 0.9, 
-        height: 400,
-        margin: {
-              top: 15,
-              right: 15,
-              bottom: 40,
-              left: 60,
-        }, 
-    }
-    dimensions.boundedWidth = dimensions.width - dimensions.margin.left - dimensions.margin.right
-    dimensions.boundedHeight = dimensions.height - dimensions.margin.top - dimensions.margin.bottom
+    const dimensions = getDimensions();
+
+    const xScale = d3.scaleLinear() 
+            .domain(d3.extent(dataset, xAccessor)) 
+            .range([0, dimensions.boundedWidth])
+            .nice()
+
+    const yScale = d3.scaleLinear()
+        .domain(d3.extent(dataset, yAccessor))
+        .range([dimensions.boundedHeight, 0])
+        .nice()
     
+    const colorScale = d3.scaleLinear()
+        .domain(d3.extent(dataset, colorAccesor))
+        .range(["skyblue", "darkslategray"])
+
+    const xAxisGenerator = d3.axisBottom()
+        .scale(xScale)
+
+    const yAxisGenerator = d3.axisLeft()
+        .scale(yScale)
+        .ticks(4)
+
     const wrapper = d3.select('#wrapper')
         .append("svg")
         .attr("width", dimensions.width)
@@ -25,45 +35,82 @@
     const bounds = wrapper.append('g')
         .style('transform', `translate(${dimensions.margin.left}px, ${dimensions.margin.top}px)`);
     
-    async function drawLineChart() {
-        const dataset = await d3.json('./my_weather_data.json');
-        const yScale = d3.scaleLinear()
-            .domain(d3.extent(dataset, yAccessor))
-            .range([dimensions.boundedHeight, 0])
+    async function drawChart() {
+        const xAxis = bounds.append("g")
+            .call(xAxisGenerator)
+            .style("transform", `translateY(${dimensions.boundedHeight}px)`)
+
+        const xAxisLabel = xAxis.append("text")
+            .attr("x", dimensions.boundedWidth / 2)
+            .attr("y", dimensions.margin.bottom - 10)
+            .attr("fill", "black")
+            .style("font-size", "1.4em")
+            .html("Dew point (&deg;F)")
+
+        const yAxis = bounds.append("g")
+            .call(yAxisGenerator)
+
+        const yAxisLabel = yAxis.append("text")
+            .attr("x", -dimensions.boundedHeight / 2)
+            .attr("y", -dimensions.margin.left + 10)
+            .attr("fill", "black")
+            .style("font-size", "1.4em")
+            .style("transform", "rotate(-90deg)") 
+            .style("text-anchor", "middle")
+            .text("Relative humidity")
+
+        let dots = bounds.selectAll("circle")
+            .data(dataset)
+            .enter()
+            .append("circle")
+            .attr("cx", d => xScale(xAccessor(d)))
+            .attr("cy", d => yScale(yAccessor(d)))
+            .attr("r", 5)
+            .attr("fill", d => colorScale(colorAccesor(d)))
         
-        const xScale = d3.scaleTime() 
-            .domain(d3.extent(dataset, xAccessor)) 
-            .range([0, dimensions.boundedWidth])
+    }
 
-        const freezingTemperaturePlacement = yScale(32) 
-        const freezingTemperatures = bounds.append("rect")
-            .attr("x", 0)
-            .attr("width", dimensions.boundedWidth) 
-            .attr("y", freezingTemperaturePlacement) 
-            .attr("height", dimensions.boundedHeight - freezingTemperaturePlacement)
-            .attr("fill", "#e0f3f3")
+    function drawDots(dataset, color) {
+ 
+        const dots = bounds.selectAll("circle").data(dataset)
+        
+        // dots.enter()
+        //     .append("circle")
+        //     .merge(dots) // all dates both entering now and already in _groups
+        //         .attr("cx", d => xScale(xAccessor(d))) 
+        //         .attr("cy", d => yScale(yAccessor(d))) 
+        //         .attr("r", 5)
+        //         .attr("fill", color)
 
-        const lineGenerator = d3.line() 
-            .x(d => xScale(xAccessor(d))) 
-            .y(d => yScale(yAccessor(d)))
+        // same as above but .join() is shortcut for .enter(), .append(), .merge()
+        dots.join("circle") 
+            .attr("cx", d => xScale(xAccessor(d))) 
+            .attr("cy", d => yScale(yAccessor(d))) 
+            .attr("r", 5)
+            .attr("fill", color)
+    }
 
-        const line = bounds.append("path")
-            .datum(dataset)
-            .attr("d", lineGenerator)
-            .attr("fill", "none")
-            .attr("stroke", "#af9358")
-            .attr("stroke-width", 2)
+    function getDimensions() {
+        const width = d3.min([
+            window.innerWidth * 0.9,
+            window.innerHeight * 0.9
+        ]);
 
-        const yAxisGenerator = d3.axisLeft().scale(yScale)
-        const yAxis = bounds.append("g").call(yAxisGenerator)
-        // yAxisGenerator(yAxis)
-
-        const xAxisGenerator = d3.axisBottom().scale(xScale)
-        const xAxis = bounds.append("g").call(xAxisGenerator)
-            .style("transform", `translateY(${dimensions.boundedHeight}px)`);
-            console.log(dimensions)
+        let dimensions = {
+            width,
+            height: width,
+            margin: {
+                  top: 10,
+                  right: 10,
+                  bottom: 50,
+                  left: 50,
+            }, 
+        }
+        dimensions.boundedWidth = dimensions.width - dimensions.margin.left - dimensions.margin.right
+        dimensions.boundedHeight = dimensions.height - dimensions.margin.top - dimensions.margin.bottom;
+        return dimensions;
     }
     
-    drawLineChart();
+    drawChart();
 })();
 
