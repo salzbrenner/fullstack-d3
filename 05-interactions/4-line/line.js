@@ -153,6 +153,7 @@ async function drawLineChart() {
 
     // Use the closestYValue to set the temperature in our tooltip
     const formatTemperature = d => `${d3.format(".1f")(d)}°F`
+    console.log(formatTemperature(closestYValue), closestYValue)
     tooltip.select("#temperature").text(formatTemperature(closestYValue))
 
     // Grab the x,y position of our closest point
